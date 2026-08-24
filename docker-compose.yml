@@ -1,0 +1,41 @@
+services:
+  api:
+    build:
+      context: ./server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - TZ=UTC
+      - PORT=5000
+      - DATA_DIR=/app/data
+      - DB_PATH=/app/data/weather.db
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  scraper:
+    build:
+      context: ./scraper
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TZ=UTC
+      - API_URL=http://api:5000/api/data
+    volumes:
+      # Mount host data directory to persist jsonl files and share with services
+      - ./data:/app/data
+    depends_on:
+      api:
+        condition: service_healthy

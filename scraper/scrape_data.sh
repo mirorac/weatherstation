@@ -4,16 +4,27 @@
 # treat unset variables as an error, and ensure pipeline failures propagate.
 set -euo pipefail
 
-# Tuya Cloud API Credentials
-CLIENT_ID="rhncamrcg4sm3uehtkca"
-CLIENT_SECRET="86b6253f578c45bfb8be432d994962ed"
+# Automatically load .env file if present in the current or script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/.env" ]]; then
+    # shellcheck disable=SC1091
+    set -a
+    source "${SCRIPT_DIR}/.env"
+    set +a
+elif [[ -f ".env" ]]; then
+    # shellcheck disable=SC1091
+    set -a
+    source ".env"
+    set +a
+fi
 
-# API Endpoint & Target Device
-BASE_URL="https://openapi.tuyaeu.com"
-DEVICE_ID="bf637c44012ca3c7979ia7"
-
-# Polling interval in seconds (300s = 5 minutes)
-INTERVAL=300
+# Tuya Cloud API Credentials & Target Settings (read from environment / .env)
+CLIENT_ID="${CLIENT_ID:?CLIENT_ID environment variable is required}"
+CLIENT_SECRET="${CLIENT_SECRET:?CLIENT_SECRET environment variable is required}"
+BASE_URL="${BASE_URL:-https://openapi.tuyaeu.com}"
+DEVICE_ID="${DEVICE_ID:-bf637c44012ca3c7979ia7}"
+INTERVAL="${INTERVAL:-300}"
+API_URL="${API_URL:-http://api:5000/api/data}"
 
 TOKEN_PATH="/v1.0/token?grant_type=1"
 
@@ -70,12 +81,8 @@ get_properties() {
     path="/v2.0/cloud/thing/${DEVICE_ID}/shadow/properties"
     t=$(python3 -c 'import time; print(int(time.time() * 1000))')
 
-    # Build signature string for v2.0 endpoint (HTTPMethod + "\n" + Content-SHA256 + "\n" + Headers + "\n" + URL)
-    string_to_sign=$(
-        printf 'GET\n%s\n\n%s' \
-            "$EMPTY_BODY_SHA256" \
-            "$path"
-    )
+    # Build signature string for v2.0 endpoint
+    string_to_sign=$(printf 'GET\n%s\n\n%s' "$EMPTY_BODY_SHA256" "$path")
 
     # Generate signature using CLIENT_ID + ACCESS_TOKEN + timestamp + string_to_sign
     sign=$(
@@ -85,7 +92,6 @@ get_properties() {
         tr '[:lower:]' '[:upper:]'
     )
 
-    # Perform GET request for device properties
     response=$(
         curl -fsS \
             "${BASE_URL}${path}" \
@@ -115,7 +121,15 @@ while true; do
         # Ensure the response is valid JSON before appending
         if echo "$response" | jq -ce . >/dev/null; then
             echo "$response" | jq -c . >> "$OUTPUT"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') OK"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') OK (saved to $OUTPUT)"
+
+            # Forward new data to API server if available (non-blocking failure)
+            if [[ -n "${API_URL:-}" ]]; then
+                curl -sS -X POST "$API_URL" \
+                    -H "Content-Type: application/json" \
+                    -d "$response" \
+                    --max-time 5 >/dev/null 2>&1 || echo "$(date '+%Y-%m-%d %H:%M:%S') Warning: Failed to push to API at $API_URL" >&2
+            fi
         else
             echo "$(date '+%Y-%m-%d %H:%M:%S') Invalid JSON response" >&2
             echo "$response" >&2
