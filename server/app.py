@@ -51,7 +51,7 @@ def parse_and_insert_raw(connection: sqlite3.Connection, payload: dict[str, Any]
         value = property_data.get("value")
         rows.append(
             (
-                property_data.get("time") or recorded_at,
+                recorded_at or property_data.get("time"),
                 code,
                 str(value) if value is not None else None,
                 float(value)

@@ -118,8 +118,14 @@ while true; do
 
     # Fetch and append property data
     if response=$(get_properties); then
-        # Ensure the response is valid JSON before appending
-        if echo "$response" | jq -ce . >/dev/null; then
+        if echo "$response" | jq -e '.success == false and .code == 1010' >/dev/null; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') Tuya token invalid; refreshing token"
+            get_token
+            response=$(get_properties) || response=""
+        fi
+
+        # Persist and forward only successful property responses.
+        if echo "$response" | jq -ce '.success == true and (.result.properties | type == "array")' >/dev/null; then
             echo "$response" | jq -c . >> "$OUTPUT"
             echo "$(date '+%Y-%m-%d %H:%M:%S') OK (saved to $OUTPUT)"
 
@@ -131,7 +137,7 @@ while true; do
                     --max-time 5 >/dev/null 2>&1 || echo "$(date '+%Y-%m-%d %H:%M:%S') Warning: Failed to push to API at $API_URL" >&2
             fi
         else
-            echo "$(date '+%Y-%m-%d %H:%M:%S') Invalid JSON response" >&2
+            echo "$(date '+%Y-%m-%d %H:%M:%S') Invalid Tuya property response" >&2
             echo "$response" >&2
         fi
     else

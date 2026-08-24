@@ -6,7 +6,9 @@ import pytest_asyncio
 from app import create_app
 
 
-def payload(timestamp: int, temperature: int = 215) -> dict:
+def payload(
+    timestamp: int, temperature: int = 215, property_timestamp: int | None = None
+) -> dict:
     return {
         "success": True,
         "t": timestamp,
@@ -16,14 +18,14 @@ def payload(timestamp: int, temperature: int = 215) -> dict:
                 {
                     "code": "temp_current",
                     "dp_id": 1,
-                    "time": timestamp,
+                    "time": property_timestamp or timestamp,
                     "type": "value",
                     "value": temperature,
                 },
                 {
                     "code": "wd",
                     "dp_id": 112,
-                    "time": timestamp,
+                    "time": property_timestamp or timestamp,
                     "type": "enum",
                     "value": "N",
                 },
@@ -59,6 +61,18 @@ async def test_ingestion_updates_latest_and_historical_query(client):
     latest = await (await client.get("/api/latest?code=temp_current")).get_json()
     assert latest["result"]["timestamp"] == 2000
     assert latest["result"]["num_value"] == 230.0
+
+    history = await (
+        await client.get("/api/measurements?code=temp_current&order=asc")
+    ).get_json()
+    assert history["count"] == 2
+    assert [reading["timestamp"] for reading in history["results"]] == [1000, 2000]
+
+
+@pytest.mark.asyncio
+async def test_ingestion_preserves_polls_with_unchanged_device_timestamps(client):
+    response = await client.post("/api/data", json=payload(2000, property_timestamp=1000))
+    assert response.status_code == 200
 
     history = await (
         await client.get("/api/measurements?code=temp_current&order=asc")
