@@ -106,13 +106,13 @@ docker compose down
 
 Once running, the API is available at `http://localhost:5000`:
 
-| Method | Endpoint                        | Description                                                                         |
-| ------ | ------------------------------- | ----------------------------------------------------------------------------------- |
-| `GET`  | `/api/health`                   | Service health status                                                               |
-| `GET`  | `/api/latest`                   | Latest readings for all metrics                                                     |
-| `GET`  | `/api/latest?code=temp_current` | Latest reading for a specific metric code                                           |
-| `GET`  | `/api/measurements`             | Query historical data (filters: `code`, `start_time`, `end_time`, `limit`, `order`) |
-| `GET`  | `/api/events`                   | Server-Sent Events (SSE) stream for live updates                                    |
+| Method | Endpoint                        | Description                                                                                         |
+| ------ | ------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/health`                   | Service health status                                                                               |
+| `GET`  | `/api/latest`                   | Latest readings for all metrics                                                                     |
+| `GET`  | `/api/latest?code=temp_current` | Latest reading for a specific metric code                                                           |
+| `GET`  | `/api/measurements`             | Query historical data (filters: `code`, `start_time`, `end_time`, `limit`, `order`)                 |
+| `GET`  | `/api/events`                   | Server-Sent Events (SSE) stream for live updates                                                    |
 | `POST` | `/api/data`                     | Ingest new measurement payload (requires `X-API-Key` or `Bearer` if `INGEST_API_KEY` is configured) |
 
 ---
