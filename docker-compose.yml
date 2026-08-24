@@ -2,6 +2,7 @@ services:
   api:
     build:
       context: ./server
+      target: runtime
     restart: unless-stopped
     ports:
       - "5000:5000"
