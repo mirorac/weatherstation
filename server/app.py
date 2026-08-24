@@ -104,6 +104,7 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
     app.config.update(
         DATA_DIR=os.environ.get("DATA_DIR", "data"),
         DB_PATH=os.environ.get("DB_PATH", ":memory:"),
+        INGEST_API_KEY=os.environ.get("INGEST_API_KEY", ""),
     )
     if config:
         app.config.update(config)
@@ -138,6 +139,19 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
 
     @app.post("/api/data")
     async def ingest_data():
+        expected_api_key = app.config.get("INGEST_API_KEY")
+        if expected_api_key:
+            auth_header = request.headers.get("Authorization", "")
+            api_key_header = request.headers.get("X-API-Key", "")
+            bearer_token = (
+                auth_header[7:].strip()
+                if auth_header.startswith("Bearer ")
+                else ""
+            )
+            provided_key = api_key_header or bearer_token
+            if not provided_key or provided_key != expected_api_key:
+                return jsonify({"error": "Unauthorized"}), 401
+
         payload = await request.get_json(silent=True)
         if not payload:
             return jsonify({"error": "Invalid or empty JSON payload"}), 400

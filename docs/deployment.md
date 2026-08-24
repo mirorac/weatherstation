@@ -56,6 +56,8 @@ weatherstation/
    BASE_URL=https://openapi.tuyaeu.com
    DEVICE_ID=bf637c44012ca3c7979ia7
    INTERVAL=300
+   # Optional: set secret API key to protect POST /api/data from unauthorized callers
+   INGEST_API_KEY=your_ingest_secret_key
    ```
 
 ---
@@ -111,7 +113,7 @@ Once running, the API is available at `http://localhost:5000`:
 | `GET`  | `/api/latest?code=temp_current` | Latest reading for a specific metric code                                           |
 | `GET`  | `/api/measurements`             | Query historical data (filters: `code`, `start_time`, `end_time`, `limit`, `order`) |
 | `GET`  | `/api/events`                   | Server-Sent Events (SSE) stream for live updates                                    |
-| `POST` | `/api/data`                     | Ingest new measurement payload                                                      |
+| `POST` | `/api/data`                     | Ingest new measurement payload (requires `X-API-Key` or `Bearer` if `INGEST_API_KEY` is configured) |
 
 ---
 

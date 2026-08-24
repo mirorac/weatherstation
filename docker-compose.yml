@@ -11,6 +11,7 @@ services:
       - PORT=5000
       - DATA_DIR=/app/data
       - DB_PATH=/app/data/weather.db
+      - INGEST_API_KEY=${INGEST_API_KEY:-}
     volumes:
       - ./data:/app/data
     healthcheck:
@@ -34,6 +35,7 @@ services:
     environment:
       - TZ=UTC
       - API_URL=http://api:5000/api/data
+      - INGEST_API_KEY=${INGEST_API_KEY:-}
     volumes:
       # Mount host data directory to persist jsonl files and share with services
       - ./data:/app/data

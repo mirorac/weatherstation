@@ -25,6 +25,7 @@ BASE_URL="${BASE_URL:-https://openapi.tuyaeu.com}"
 DEVICE_ID="${DEVICE_ID:-bf637c44012ca3c7979ia7}"
 INTERVAL="${INTERVAL:-300}"
 API_URL="${API_URL:-http://api:5000/api/data}"
+INGEST_API_KEY="${INGEST_API_KEY:-}"
 
 TOKEN_PATH="/v1.0/token?grant_type=1"
 
@@ -131,8 +132,13 @@ while true; do
 
             # Forward new data to API server if available (non-blocking failure)
             if [[ -n "${API_URL:-}" ]]; then
+                auth_args=()
+                if [[ -n "${INGEST_API_KEY:-}" ]]; then
+                    auth_args=(-H "X-API-Key: ${INGEST_API_KEY}")
+                fi
                 curl -sS -X POST "$API_URL" \
                     -H "Content-Type: application/json" \
+                    "${auth_args[@]}" \
                     -d "$response" \
                     --max-time 5 >/dev/null 2>&1 || echo "$(date '+%Y-%m-%d %H:%M:%S') Warning: Failed to push to API at $API_URL" >&2
             fi
