@@ -89,11 +89,16 @@ def load_initial_jsonl_data(
     for file_path in files:
         try:
             with open(file_path, encoding="utf-8") as data_file:
-                for line in data_file:
+                for line_number, line in enumerate(data_file, start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
                     try:
                         inserted += parse_and_insert_raw(connection, json.loads(line))
                     except json.JSONDecodeError:
-                        app.logger.warning("Skipping invalid JSON in %s", file_path)
+                        app.logger.warning(
+                            "Skipping invalid JSON in %s:%d", file_path, line_number
+                        )
         except OSError as error:
             app.logger.error("Could not load %s: %s", file_path, error)
     app.logger.info("Loaded %d property measurements from %d JSONL file(s).", inserted, len(files))
