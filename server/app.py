@@ -1,15 +1,200 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import glob
 import json
 import os
 import sqlite3
 import time
-from typing import Any
+from typing import Any, Callable
 
 from quart import Quart, Response, jsonify, request
 from quart_cors import cors
+
+
+@dataclass
+class RawProperty:
+    code: str
+    value: Any
+    type: str
+    dp_id: int | None
+    custom_name: str
+    time: int | None
+    recorded_at: int | None
+    tid: str
+
+
+@dataclass
+class TransformedMeasurement:
+    timestamp: int
+    code: str
+    value: str | None
+    num_value: float | None
+    type: str
+    dp_id: int | None
+    custom_name: str
+    recorded_at: int | None
+    tid: str
+
+
+WIND_DIRECTION_DEGREES: dict[str, float] = {
+    "N": 0.0,
+    "NNE": 22.5,
+    "NE": 45.0,
+    "ENE": 67.5,
+    "E": 90.0,
+    "ESE": 112.5,
+    "SE": 135.0,
+    "SSE": 157.5,
+    "S": 180.0,
+    "SSW": 202.5,
+    "SW": 225.0,
+    "WSW": 247.5,
+    "W": 270.0,
+    "WNW": 292.5,
+    "NW": 315.0,
+    "NNW": 337.5,
+}
+
+
+def _scaled_decimal_transformer(
+    target_code: str, scale: float = 10.0
+) -> Callable[[RawProperty], TransformedMeasurement]:
+    def transformer(prop: RawProperty) -> TransformedMeasurement:
+        raw_val = prop.value
+        num_val = (
+            round(float(raw_val) / scale, 2)
+            if isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool)
+            else None
+        )
+        val_str = str(num_val) if num_val is not None else (str(raw_val) if raw_val is not None else None)
+        timestamp = prop.recorded_at or prop.time or int(time.time() * 1000)
+        return TransformedMeasurement(
+            timestamp=timestamp,
+            code=target_code,
+            value=val_str,
+            num_value=num_val,
+            type=prop.type,
+            dp_id=prop.dp_id,
+            custom_name=prop.custom_name,
+            recorded_at=prop.recorded_at,
+            tid=prop.tid,
+        )
+
+    return transformer
+
+
+def _direct_numeric_transformer(
+    target_code: str,
+) -> Callable[[RawProperty], TransformedMeasurement]:
+    def transformer(prop: RawProperty) -> TransformedMeasurement:
+        raw_val = prop.value
+        num_val = (
+            float(raw_val)
+            if isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool)
+            else None
+        )
+        val_str = str(raw_val) if raw_val is not None else None
+        timestamp = prop.recorded_at or prop.time or int(time.time() * 1000)
+        return TransformedMeasurement(
+            timestamp=timestamp,
+            code=target_code,
+            value=val_str,
+            num_value=num_val,
+            type=prop.type,
+            dp_id=prop.dp_id,
+            custom_name=prop.custom_name,
+            recorded_at=prop.recorded_at,
+            tid=prop.tid,
+        )
+
+    return transformer
+
+
+def transform_wind_direction(prop: RawProperty) -> TransformedMeasurement:
+    val_str = str(prop.value) if prop.value is not None else None
+    degrees = WIND_DIRECTION_DEGREES.get(val_str.upper() if val_str else "", None)
+    timestamp = prop.recorded_at or prop.time or int(time.time() * 1000)
+    return TransformedMeasurement(
+        timestamp=timestamp,
+        code="wind_direction",
+        value=val_str,
+        num_value=degrees,
+        type=prop.type,
+        dp_id=prop.dp_id,
+        custom_name=prop.custom_name,
+        recorded_at=prop.recorded_at,
+        tid=prop.tid,
+    )
+
+
+def transform_comfort_level(prop: RawProperty) -> TransformedMeasurement:
+    val_str = str(prop.value) if prop.value is not None else None
+    timestamp = prop.recorded_at or prop.time or int(time.time() * 1000)
+    return TransformedMeasurement(
+        timestamp=timestamp,
+        code="comfort_level",
+        value=val_str,
+        num_value=None,
+        type=prop.type,
+        dp_id=prop.dp_id,
+        custom_name=prop.custom_name,
+        recorded_at=prop.recorded_at,
+        tid=prop.tid,
+    )
+
+
+def default_transformer(prop: RawProperty) -> TransformedMeasurement:
+    raw_val = prop.value
+    num_val = (
+        float(raw_val)
+        if isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool)
+        else None
+    )
+    val_str = str(raw_val) if raw_val is not None else None
+    timestamp = prop.recorded_at or prop.time or int(time.time() * 1000)
+    return TransformedMeasurement(
+        timestamp=timestamp,
+        code=prop.code,
+        value=val_str,
+        num_value=num_val,
+        type=prop.type,
+        dp_id=prop.dp_id,
+        custom_name=prop.custom_name,
+        recorded_at=prop.recorded_at,
+        tid=prop.tid,
+    )
+
+
+PROPERTY_TRANSFORMERS: dict[str, Callable[[RawProperty], TransformedMeasurement | None]] = {
+    "wd": transform_wind_direction,
+    "temp_current": _scaled_decimal_transformer("temp_current"),
+    "intemp": _scaled_decimal_transformer("indoor_temperature"),
+    "ch1temp": _scaled_decimal_transformer("outdoor_temperature"),
+    "inhum": _scaled_decimal_transformer("indoor_humidity"),
+    "ch1hum": _scaled_decimal_transformer("outdoor_humidity"),
+    "pressure": _scaled_decimal_transformer("pressure"),
+    "windspeed": _direct_numeric_transformer("wind_speed"),
+    "gustwind": _direct_numeric_transformer("gust_wind"),
+    "rain_1h": _direct_numeric_transformer("rain_1h"),
+    "rain_24h": _direct_numeric_transformer("rain_24h"),
+    "rain": _direct_numeric_transformer("rain"),
+    "com": transform_comfort_level,
+    # Ignore raw/diagnostic payloads
+    "alarm": lambda _: None,
+    "alert": lambda _: None,
+    "unit": lambda _: None,
+    "battery": lambda _: None,
+    "basic": lambda _: None,
+    "alertup": lambda _: None,
+    "datadisplay": lambda _: None,
+}
+
+
+def apply_property_transformer(prop: RawProperty) -> TransformedMeasurement | None:
+    transformer = PROPERTY_TRANSFORMERS.get(prop.code, default_transformer)
+    return transformer(prop)
 
 
 def init_db(connection: sqlite3.Connection) -> None:
@@ -44,26 +229,39 @@ def parse_and_insert_raw(connection: sqlite3.Connection, payload: dict[str, Any]
 
     properties = payload.get("result", {}).get("properties", [])
     recorded_at = payload.get("t")
+    tid = str(payload.get("tid", ""))
     rows = []
     for property_data in properties:
-        code = property_data.get("code")
-        if not code:
+        raw_code = property_data.get("code")
+        if not raw_code:
             continue
 
-        value = property_data.get("value")
+        raw_prop = RawProperty(
+            code=raw_code,
+            value=property_data.get("value"),
+            type=property_data.get("type", ""),
+            dp_id=property_data.get("dp_id"),
+            custom_name=property_data.get("custom_name", ""),
+            time=property_data.get("time"),
+            recorded_at=recorded_at,
+            tid=tid,
+        )
+
+        transformed = apply_property_transformer(raw_prop)
+        if transformed is None:
+            continue
+
         rows.append(
             (
-                recorded_at or property_data.get("time"),
-                code,
-                str(value) if value is not None else None,
-                float(value)
-                if isinstance(value, (int, float)) and not isinstance(value, bool)
-                else None,
-                property_data.get("type", ""),
-                property_data.get("dp_id"),
-                property_data.get("custom_name", ""),
-                recorded_at,
-                payload.get("tid", ""),
+                transformed.timestamp,
+                transformed.code,
+                transformed.value,
+                transformed.num_value,
+                transformed.type,
+                transformed.dp_id,
+                transformed.custom_name,
+                transformed.recorded_at,
+                transformed.tid,
             )
         )
 
@@ -78,6 +276,8 @@ def parse_and_insert_raw(connection: sqlite3.Connection, payload: dict[str, Any]
         """,
         rows,
     )
+    connection.commit()
+    return len(rows)
     connection.commit()
     return len(rows)
 

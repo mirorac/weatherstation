@@ -52,8 +52,17 @@ async def test_startup_loads_jsonl_and_returns_latest(client):
     response = await client.get("/api/latest?code=temp_current")
     assert response.status_code == 200
     data = (await response.get_json())["result"]
-    assert data["num_value"] == 215.0
+    assert data["num_value"] == 21.5
+    assert data["value"] == "21.5"
     assert set(data.keys()) == {"timestamp", "value", "num_value", "code"}
+
+    # Check wind_direction transformed from 'wd'
+    wd_resp = await client.get("/api/latest?code=wind_direction")
+    assert wd_resp.status_code == 200
+    wd_data = (await wd_resp.get_json())["result"]
+    assert wd_data["num_value"] == 0.0
+    assert wd_data["value"] == "N"
+    assert wd_data["code"] == "wind_direction"
 
 
 @pytest.mark.asyncio
@@ -64,7 +73,7 @@ async def test_ingestion_updates_latest_and_historical_query(client):
 
     latest = await (await client.get("/api/latest?code=temp_current")).get_json()
     assert latest["result"]["timestamp"] == 2000
-    assert latest["result"]["num_value"] == 230.0
+    assert latest["result"]["num_value"] == 23.0
     assert set(latest["result"].keys()) == {"timestamp", "value", "num_value", "code"}
 
     history = await (
@@ -73,6 +82,65 @@ async def test_ingestion_updates_latest_and_historical_query(client):
     assert history["count"] == 2
     assert [reading["timestamp"] for reading in history["results"]] == [1000, 2000]
     assert set(history["results"][0].keys()) == {"timestamp", "value", "num_value", "code"}
+
+
+@pytest.mark.asyncio
+async def test_custom_transformers_for_all_properties(client):
+    full_payload = {
+        "success": True,
+        "t": 3000,
+        "tid": "full-test-reading",
+        "result": {
+            "properties": [
+                {"code": "temp_current", "value": -200, "type": "value", "dp_id": 1},
+                {"code": "intemp", "value": 248, "type": "value", "dp_id": 101},
+                {"code": "inhum", "value": 500, "type": "value", "dp_id": 102},
+                {"code": "ch1temp", "value": 220, "type": "value", "dp_id": 103},
+                {"code": "ch1hum", "value": 540, "type": "value", "dp_id": 104},
+                {"code": "pressure", "value": 9980, "type": "value", "dp_id": 109},
+                {"code": "windspeed", "value": 2, "type": "value", "dp_id": 110},
+                {"code": "gustwind", "value": 3, "type": "value", "dp_id": 111},
+                {"code": "wd", "value": "NW", "type": "enum", "dp_id": 112},
+                {"code": "rain_1h", "value": 0, "type": "value", "dp_id": 113},
+                {"code": "rain_24h", "value": 0, "type": "value", "dp_id": 114},
+                {"code": "rain", "value": 0, "type": "value", "dp_id": 134},
+                {"code": "com", "value": "comfortable", "type": "enum", "dp_id": 126},
+                {"code": "alarm", "value": "AX8AAAYAAn8AAAgA", "type": "raw", "dp_id": 127},
+            ]
+        },
+    }
+    response = await client.post("/api/data", json=full_payload)
+    assert response.status_code == 200
+    # 13 valid metrics inserted (alarm is filtered out)
+    assert (await response.get_json())["inserted_properties"] == 13
+
+    # Check wind_direction NW -> 315.0
+    wd = (await (await client.get("/api/latest?code=wind_direction")).get_json())["result"]
+    assert wd["code"] == "wind_direction"
+    assert wd["value"] == "NW"
+    assert wd["num_value"] == 315.0
+
+    # Check outdoor and indoor temperatures
+    outdoor_temp = (await (await client.get("/api/latest?code=outdoor_temperature")).get_json())["result"]
+    assert outdoor_temp["num_value"] == 22.0
+
+    indoor_temp = (await (await client.get("/api/latest?code=indoor_temperature")).get_json())["result"]
+    assert indoor_temp["num_value"] == 24.8
+
+    # Check humidity
+    indoor_hum = (await (await client.get("/api/latest?code=indoor_humidity")).get_json())["result"]
+    assert indoor_hum["num_value"] == 50.0
+
+    outdoor_hum = (await (await client.get("/api/latest?code=outdoor_humidity")).get_json())["result"]
+    assert outdoor_hum["num_value"] == 54.0
+
+    # Check pressure
+    press = (await (await client.get("/api/latest?code=pressure")).get_json())["result"]
+    assert press["num_value"] == 998.0
+
+    # Check wind_speed
+    ws = (await (await client.get("/api/latest?code=wind_speed")).get_json())["result"]
+    assert ws["num_value"] == 2.0
 
 
 @pytest.mark.asyncio
