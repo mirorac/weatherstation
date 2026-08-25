@@ -31,7 +31,8 @@ The project consists of:
 weatherstation/
 ├── data/                      # Persisted data on host (.jsonl files and weather.db)
 ├── docs/
-│   └── deployment.md          # Detailed deployment guide
+│   ├── deployment.md          # Detailed deployment guide
+│   └── development.md         # Local development and testing guide
 ├── scraper/                   # Scraper service (Bash + cURL + jq)
 │   ├── Dockerfile
 │   ├── scrape_data.sh         # Core polling, logging, and API push script
@@ -155,15 +156,10 @@ GET /api/latest?code=temp_current
 ```json
 {
   "result": {
-    "code": "temp_current",
-    "custom_name": "",
-    "dp_id": 1,
-    "num_value": 21.5,
-    "recorded_at": 1756024800000,
-    "tid": "...",
     "timestamp": 1756024800000,
-    "type": "value",
-    "value": "215"
+    "value": "215",
+    "num_value": 21.5,
+    "code": "temp_current"
   }
 }
 ```
@@ -190,15 +186,10 @@ GET /api/measurements?code=temp_current&limit=100&order=desc
   "count": 1,
   "results": [
     {
-      "code": "temp_current",
-      "custom_name": "",
-      "dp_id": 1,
-      "num_value": 21.5,
-      "recorded_at": 1756024800000,
-      "tid": "...",
       "timestamp": 1756024800000,
-      "type": "value",
-      "value": "215"
+      "value": "215",
+      "num_value": 21.5,
+      "code": "temp_current"
     }
   ]
 }

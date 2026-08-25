@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 import pytest
@@ -49,7 +51,9 @@ async def client(tmp_path):
 async def test_startup_loads_jsonl_and_returns_latest(client):
     response = await client.get("/api/latest?code=temp_current")
     assert response.status_code == 200
-    assert (await response.get_json())["result"]["num_value"] == 215.0
+    data = (await response.get_json())["result"]
+    assert data["num_value"] == 215.0
+    assert set(data.keys()) == {"timestamp", "value", "num_value", "code"}
 
 
 @pytest.mark.asyncio
@@ -61,12 +65,14 @@ async def test_ingestion_updates_latest_and_historical_query(client):
     latest = await (await client.get("/api/latest?code=temp_current")).get_json()
     assert latest["result"]["timestamp"] == 2000
     assert latest["result"]["num_value"] == 230.0
+    assert set(latest["result"].keys()) == {"timestamp", "value", "num_value", "code"}
 
     history = await (
         await client.get("/api/measurements?code=temp_current&order=asc")
     ).get_json()
     assert history["count"] == 2
     assert [reading["timestamp"] for reading in history["results"]] == [1000, 2000]
+    assert set(history["results"][0].keys()) == {"timestamp", "value", "num_value", "code"}
 
 
 @pytest.mark.asyncio

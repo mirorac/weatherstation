@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import glob
 import json
@@ -173,7 +175,7 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
         cursor = connection().cursor()
         if code:
             cursor.execute(
-                "SELECT * FROM measurements WHERE code = ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT timestamp, value, num_value, code FROM measurements WHERE code = ? ORDER BY timestamp DESC LIMIT 1",
                 (code,),
             )
             row = cursor.fetchone()
@@ -181,7 +183,8 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
         else:
             cursor.execute(
                 """
-                SELECT measurements.* FROM measurements
+                SELECT measurements.timestamp, measurements.value, measurements.num_value, measurements.code
+                FROM measurements
                 INNER JOIN (
                     SELECT code, MAX(timestamp) AS max_timestamp
                     FROM measurements GROUP BY code
@@ -200,7 +203,7 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
         limit = min(request.args.get("limit", default=500, type=int), 5000)
         order = "ASC" if request.args.get("order", "").lower() == "asc" else "DESC"
 
-        query = "SELECT * FROM measurements WHERE 1=1"
+        query = "SELECT timestamp, value, num_value, code FROM measurements WHERE 1=1"
         parameters: list[Any] = []
         if code:
             query += " AND code = ?"
