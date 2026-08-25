@@ -32,10 +32,7 @@ class TransformedMeasurement:
     value: str | None
     num_value: float | None
     type: str
-    dp_id: int | None
-    custom_name: str
     recorded_at: int | None
-    tid: str
 
 
 WIND_DIRECTION_DEGREES: dict[str, float] = {
@@ -76,10 +73,7 @@ def _scaled_decimal_transformer(
             value=val_str,
             num_value=num_val,
             type=prop.type,
-            dp_id=prop.dp_id,
-            custom_name=prop.custom_name,
             recorded_at=prop.recorded_at,
-            tid=prop.tid,
         )
 
     return transformer
@@ -103,10 +97,7 @@ def _direct_numeric_transformer(
             value=val_str,
             num_value=num_val,
             type=prop.type,
-            dp_id=prop.dp_id,
-            custom_name=prop.custom_name,
             recorded_at=prop.recorded_at,
-            tid=prop.tid,
         )
 
     return transformer
@@ -122,10 +113,7 @@ def transform_wind_direction(prop: RawProperty) -> TransformedMeasurement:
         value=val_str,
         num_value=degrees,
         type=prop.type,
-        dp_id=prop.dp_id,
-        custom_name=prop.custom_name,
         recorded_at=prop.recorded_at,
-        tid=prop.tid,
     )
 
 
@@ -138,10 +126,7 @@ def transform_comfort_level(prop: RawProperty) -> TransformedMeasurement:
         value=val_str,
         num_value=None,
         type=prop.type,
-        dp_id=prop.dp_id,
-        custom_name=prop.custom_name,
         recorded_at=prop.recorded_at,
-        tid=prop.tid,
     )
 
 
@@ -160,10 +145,7 @@ def default_transformer(prop: RawProperty) -> TransformedMeasurement:
         value=val_str,
         num_value=num_val,
         type=prop.type,
-        dp_id=prop.dp_id,
-        custom_name=prop.custom_name,
         recorded_at=prop.recorded_at,
-        tid=prop.tid,
     )
 
 
@@ -207,10 +189,7 @@ def init_db(connection: sqlite3.Connection) -> None:
             value TEXT,
             num_value REAL,
             type TEXT,
-            dp_id INTEGER,
-            custom_name TEXT,
             recorded_at INTEGER,
-            tid TEXT,
             PRIMARY KEY (timestamp, code)
         )
         """
@@ -258,10 +237,7 @@ def parse_and_insert_raw(connection: sqlite3.Connection, payload: dict[str, Any]
                 transformed.value,
                 transformed.num_value,
                 transformed.type,
-                transformed.dp_id,
-                transformed.custom_name,
                 transformed.recorded_at,
-                transformed.tid,
             )
         )
 
@@ -271,13 +247,11 @@ def parse_and_insert_raw(connection: sqlite3.Connection, payload: dict[str, Any]
     connection.executemany(
         """
         INSERT OR REPLACE INTO measurements (
-            timestamp, code, value, num_value, type, dp_id, custom_name, recorded_at, tid
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            timestamp, code, value, num_value, type, recorded_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
         """,
         rows,
     )
-    connection.commit()
-    return len(rows)
     connection.commit()
     return len(rows)
 
