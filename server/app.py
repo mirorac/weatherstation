@@ -151,7 +151,6 @@ def default_transformer(prop: RawProperty) -> TransformedMeasurement:
 
 PROPERTY_TRANSFORMERS: dict[str, Callable[[RawProperty], TransformedMeasurement | None]] = {
     "wd": transform_wind_direction,
-    "temp_current": _scaled_decimal_transformer("temp_current"),
     "intemp": _scaled_decimal_transformer("indoor_temperature"),
     "ch1temp": _scaled_decimal_transformer("outdoor_temperature"),
     "inhum": _scaled_decimal_transformer("indoor_humidity"),
@@ -164,6 +163,7 @@ PROPERTY_TRANSFORMERS: dict[str, Callable[[RawProperty], TransformedMeasurement 
     "rain": _direct_numeric_transformer("rain"),
     "com": transform_comfort_level,
     # Ignore raw/diagnostic payloads
+    "temp_current": lambda _: None,
     "alarm": lambda _: None,
     "alert": lambda _: None,
     "unit": lambda _: None,
