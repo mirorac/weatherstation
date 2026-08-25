@@ -56,6 +56,9 @@ weatherstation/
    BASE_URL=https://openapi.tuyaeu.com
    DEVICE_ID=bf637c44012ca3c7979ia7
    INTERVAL=300
+   # Optional: HTTP request and idle keep-alive timeout in seconds (default: 3600)
+   TIMEOUT_SECONDS=3600
+   KEEP_ALIVE_SECONDS=3600
    # Optional: set secret API key to protect POST /api/data from unauthorized callers
    INGEST_API_KEY=your_ingest_secret_key
    ```
@@ -99,6 +102,12 @@ docker compose logs -f scraper
 ```bash
 docker compose down
 ```
+
+### SSE Connection Lifetime
+
+The API runs Hypercorn with uvloop and one-hour `read-timeout` and `keep-alive` defaults. These can be adjusted with `TIMEOUT_SECONDS` and `KEEP_ALIVE_SECONDS` in `.env` or the deployment environment.
+
+`GET /api/events` explicitly disables Quart's response timeout and sends an SSE comment heartbeat every 30 seconds when no measurements arrive. This allows an active SSE stream to remain connected beyond one hour, subject to the timeout configuration of any reverse proxy, load balancer, CDN, or client. Configure those intermediary idle timeouts above 30 seconds as well; a truly permanent connection is never guaranteed because clients and network infrastructure can disconnect at any time.
 
 ---
 

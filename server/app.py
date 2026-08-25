@@ -403,8 +403,12 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
             try:
                 yield 'event: connected\ndata: {"status": "connected"}\n\n'
                 while True:
-                    event = await client_queue.get()
-                    yield f"event: {event['type']}\ndata: {json.dumps(event)}\n\n"
+                    try:
+                        event = await asyncio.wait_for(client_queue.get(), timeout=30)
+                    except TimeoutError:
+                        yield ": keepalive\n\n"
+                    else:
+                        yield f"event: {event['type']}\ndata: {json.dumps(event)}\n\n"
             finally:
                 app.extensions["sse_clients"].discard(client_queue)
 
