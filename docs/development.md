@@ -132,9 +132,14 @@ docker compose down
   ```json
   {
     "timestamp": 1787511666584,
-    "value": "0",
-    "num_value": 0.0,
-    "code": "windspeed"
+    "value": "NW",
+    "num_value": 315.0,
+    "code": "wind_direction"
   }
   ```
+- **Custom Transformers**: Raw Tuya properties are transformed via typed `RawProperty -> TransformedMeasurement` objects in `PROPERTY_TRANSFORMERS`:
+  - `wd` $\rightarrow$ `wind_direction` with compass degrees ($0^\circ \dots 337.5^\circ$) in `num_value`.
+  - Scaled values (scaled by $0.1$): `temp_current`, `indoor_temperature` (`intemp`), `outdoor_temperature` (`ch1temp`), `indoor_humidity` (`inhum`), `outdoor_humidity` (`ch1hum`), `pressure`.
+  - Renamed metrics with underscores: `wind_speed` (`windspeed`), `gust_wind` (`gustwind`), `comfort_level` (`com`).
+  - Hardware/diagnostic raw payloads (`alarm`, `alert`, `battery`, `unit`, etc.) return `None` and are skipped during ingestion.
 - **Type Annotations**: Use `from __future__ import annotations` at the top of Python modules when using modern union types (`|`) across different Python versions.
