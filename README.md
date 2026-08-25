@@ -169,11 +169,11 @@ GET /api/latest?code=temp_current
 ### Query Historical Measurements
 
 ```http
-GET /api/measurements?code=temp_current&limit=100&order=desc
+GET /api/measurements?code=temp_current,wind_direction&limit=100&order=desc
 ```
 
 - **Query Parameters:**
-  - `code` _(optional)_: Filter by property code.
+  - `code` _(optional)_: Filter by one or more comma-separated property codes.
   - `start_time` _(optional)_: Start timestamp (epoch ms inclusive).
   - `end_time` _(optional)_: End timestamp (epoch ms inclusive).
   - `limit` _(optional)_: Max results to return (default: `500`, max: `5000`).
@@ -184,14 +184,17 @@ GET /api/measurements?code=temp_current&limit=100&order=desc
 ```json
 {
   "count": 1,
-  "results": [
-    {
+  "results": {
+    "temp_current": [
+      {
       "timestamp": 1756024800000,
       "value": "215",
       "num_value": 21.5,
-      "code": "temp_current"
-    }
-  ]
+      "code": "temp_current",
+      "recorded_at": 1756024800000
+      }
+    ]
+  }
 }
 ```
 

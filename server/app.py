@@ -371,28 +371,50 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
 
     @app.get("/api/measurements")
     async def query_measurements():
-        code = request.args.get("code")
+        codes = [code.strip() for code in request.args.get("code", "").split(",") if code.strip()]
         start_time = request.args.get("start_time", type=int)
         end_time = request.args.get("end_time", type=int)
         limit = min(request.args.get("limit", default=500, type=int), 5000)
         order = "ASC" if request.args.get("order", "").lower() == "asc" else "DESC"
 
-        query = "SELECT timestamp, value, num_value, code FROM measurements WHERE 1=1"
         parameters: list[Any] = []
-        if code:
-            query += " AND code = ?"
-            parameters.append(code)
+        where_clauses = ["1=1"]
+        if codes:
+            placeholders = ", ".join("?" for _ in codes)
+            where_clauses.append(f"code IN ({placeholders})")
+            parameters.extend(codes)
         if start_time is not None:
-            query += " AND timestamp >= ?"
+            where_clauses.append("timestamp >= ?")
             parameters.append(start_time)
         if end_time is not None:
-            query += " AND timestamp <= ?"
+            where_clauses.append("timestamp <= ?")
             parameters.append(end_time)
-        query += f" ORDER BY timestamp {order} LIMIT ?"
-        parameters.append(limit)
+
+        where_sql = " AND ".join(where_clauses)
+
+        if codes:
+            query = f"""
+                SELECT timestamp, value, num_value, code, recorded_at
+                FROM (
+                    SELECT timestamp, value, num_value, code, recorded_at,
+                           ROW_NUMBER() OVER (PARTITION BY code ORDER BY timestamp {order}) AS rn
+                    FROM measurements
+                    WHERE {where_sql}
+                )
+                WHERE rn <= ?
+                ORDER BY timestamp {order}
+            """
+            parameters.append(limit)
+        else:
+            query = f"SELECT timestamp, value, num_value, code, recorded_at FROM measurements WHERE {where_sql} ORDER BY timestamp {order} LIMIT ?"
+            parameters.append(limit)
 
         rows = connection().execute(query, parameters).fetchall()
-        return jsonify({"count": len(rows), "results": [dict(row) for row in rows]})
+        results: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            measurement = dict(row)
+            results.setdefault(measurement["code"], []).append(measurement)
+        return jsonify({"count": len(rows), "results": results})
 
     @app.get("/api/events")
     async def sse_events():

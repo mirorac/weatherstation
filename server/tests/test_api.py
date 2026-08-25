@@ -80,8 +80,30 @@ async def test_ingestion_updates_latest_and_historical_query(client):
         await client.get("/api/measurements?code=temp_current&order=asc")
     ).get_json()
     assert history["count"] == 2
-    assert [reading["timestamp"] for reading in history["results"]] == [1000, 2000]
-    assert set(history["results"][0].keys()) == {"timestamp", "value", "num_value", "code"}
+    assert [reading["timestamp"] for reading in history["results"]["temp_current"]] == [1000, 2000]
+    assert set(history["results"]["temp_current"][0].keys()) == {
+        "timestamp", "value", "num_value", "code", "recorded_at"
+    }
+
+
+@pytest.mark.asyncio
+async def test_historical_query_supports_multiple_codes_and_groups_results(client):
+    await client.post("/api/data", json=payload(2000, 230))
+    await client.post("/api/data", json=payload(3000, 240))
+
+    # Test multi-code query and per-code limit
+    history = await (
+        await client.get("/api/measurements?code=temp_current,wind_direction&limit=2&order=asc")
+    ).get_json()
+
+    assert history["count"] == 4
+    assert set(history["results"]) == {"temp_current", "wind_direction"}
+    assert len(history["results"]["temp_current"]) == 2
+    assert len(history["results"]["wind_direction"]) == 2
+    assert [r["timestamp"] for r in history["results"]["temp_current"]] == [1000, 2000]
+    assert [r["timestamp"] for r in history["results"]["wind_direction"]] == [1000, 2000]
+    assert history["results"]["temp_current"][0]["recorded_at"] == 1000
+    assert history["results"]["wind_direction"][0]["recorded_at"] == 1000
 
 
 @pytest.mark.asyncio
@@ -152,7 +174,7 @@ async def test_ingestion_preserves_polls_with_unchanged_device_timestamps(client
         await client.get("/api/measurements?code=temp_current&order=asc")
     ).get_json()
     assert history["count"] == 2
-    assert [reading["timestamp"] for reading in history["results"]] == [1000, 2000]
+    assert [reading["timestamp"] for reading in history["results"]["temp_current"]] == [1000, 2000]
 
 
 @pytest.mark.asyncio
