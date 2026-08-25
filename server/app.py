@@ -408,11 +408,15 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
             finally:
                 app.extensions["sse_clients"].discard(client_queue)
 
-        return Response(
+        response = Response(
             event_generator(),
             content_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+        response.timeout = None  # Disable timeout for SSE connections
+
+        return response
 
     return app
 
