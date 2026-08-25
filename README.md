@@ -176,10 +176,11 @@ GET /api/measurements?code=temp_current,wind_direction&limit=100&order=desc
   - `code` _(optional)_: Filter by one or more comma-separated property codes.
   - `start_time` _(optional)_: Start timestamp (epoch ms inclusive).
   - `end_time` _(optional)_: End timestamp (epoch ms inclusive).
-  - `limit` _(optional)_: Max results to return (default: `500`, max: `5000`).
+  - `limit` _(optional)_: Max results to return per metric code when `code` is specified, or overall max results (default: `500`, max: `5000`).
   - `order` _(optional)_: `asc` or `desc` (default: `desc`).
+  - `format` _(optional)_: Output format. Defaults to standard object lists; pass `matrix` for columnar multi-dimensional array format.
 
-**Response (`200 OK`):**
+**Response (`200 OK` - default format):**
 
 ```json
 {
@@ -187,13 +188,27 @@ GET /api/measurements?code=temp_current,wind_direction&limit=100&order=desc
   "results": {
     "temp_current": [
       {
-      "timestamp": 1756024800000,
-      "value": "215",
-      "num_value": 21.5,
-      "code": "temp_current",
-      "recorded_at": 1756024800000
+        "timestamp": 1756024800000,
+        "value": "215",
+        "num_value": 21.5,
+        "code": "temp_current",
+        "recorded_at": 1756024800000
       }
     ]
+  }
+}
+```
+
+**Response (`200 OK` - `format=matrix`):**
+
+```json
+{
+  "count": 1,
+  "results": {
+    "temp_current": {
+      "columns": ["num_value", "recorded_at", "timestamp", "value"],
+      "data": [[21.5, 1756024800000, 1756024800000, "215"]]
+    }
   }
 }
 ```

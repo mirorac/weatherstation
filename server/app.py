@@ -162,8 +162,8 @@ PROPERTY_TRANSFORMERS: dict[str, Callable[[RawProperty], TransformedMeasurement 
     "rain_24h": _direct_numeric_transformer("rain_24h"),
     "rain": _direct_numeric_transformer("rain"),
     "com": transform_comfort_level,
+    "temp_current": _scaled_decimal_transformer("temp_current"),
     # Ignore raw/diagnostic payloads
-    "temp_current": lambda _: None,
     "alarm": lambda _: None,
     "alert": lambda _: None,
     "unit": lambda _: None,
@@ -376,6 +376,7 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
         end_time = request.args.get("end_time", type=int)
         limit = min(request.args.get("limit", default=500, type=int), 5000)
         order = "ASC" if request.args.get("order", "").lower() == "asc" else "DESC"
+        response_format = request.args.get("format", "").lower()
 
         parameters: list[Any] = []
         where_clauses = ["1=1"]
@@ -410,6 +411,21 @@ def create_app(config: dict[str, Any] | None = None) -> Quart:
             parameters.append(limit)
 
         rows = connection().execute(query, parameters).fetchall()
+        if response_format == "matrix":
+            columns = ["num_value", "recorded_at", "timestamp", "value"]
+            matrix_results: dict[str, dict[str, Any]] = {}
+            for row in rows:
+                code_val = row["code"]
+                if code_val not in matrix_results:
+                    matrix_results[code_val] = {
+                        "columns": columns,
+                        "data": [],
+                    }
+                matrix_results[code_val]["data"].append(
+                    [row["num_value"], row["recorded_at"], row["timestamp"], row["value"]]
+                )
+            return jsonify({"count": len(rows), "results": matrix_results})
+
         results: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
             measurement = dict(row)

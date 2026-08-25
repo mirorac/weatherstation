@@ -107,6 +107,29 @@ async def test_historical_query_supports_multiple_codes_and_groups_results(clien
 
 
 @pytest.mark.asyncio
+async def test_historical_query_supports_matrix_format(client):
+    await client.post("/api/data", json=payload(2000, 230))
+
+    resp = await client.get("/api/measurements?code=temp_current,wind_direction&format=matrix&order=asc")
+    assert resp.status_code == 200
+    data = await resp.get_json()
+
+    assert data["count"] == 4
+    assert set(data["results"].keys()) == {"temp_current", "wind_direction"}
+    assert data["results"]["temp_current"]["columns"] == ["num_value", "recorded_at", "timestamp", "value"]
+    assert data["results"]["wind_direction"]["columns"] == ["num_value", "recorded_at", "timestamp", "value"]
+
+    assert data["results"]["temp_current"]["data"] == [
+        [21.5, 1000, 1000, "21.5"],
+        [23.0, 2000, 2000, "23.0"],
+    ]
+    assert data["results"]["wind_direction"]["data"] == [
+        [0.0, 1000, 1000, "N"],
+        [0.0, 2000, 2000, "N"],
+    ]
+
+
+@pytest.mark.asyncio
 async def test_custom_transformers_for_all_properties(client):
     full_payload = {
         "success": True,
